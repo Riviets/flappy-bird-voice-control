@@ -2,6 +2,7 @@ import sounddevice as sd
 import numpy as np
 from pygame import *
 from random import randint
+import os
 
 sr = 16000
 block = 256
@@ -18,6 +19,14 @@ init()
 window_size = 1200, 800
 window = display.set_mode(window_size)
 clock = time.Clock()
+
+bird_image = image.load("bird.png").convert_alpha()
+bird_image = transform.scale(bird_image, (100, 100))
+
+# ЗАВАНТАЖЕННЯ ФОНУ ТА ТРУБ
+bg_image = image.load("bg.png").convert()
+bg_image = transform.scale(bg_image, window_size)
+pipe_img_raw = image.load("pipe.png").convert_alpha()
 
 player_rect = Rect(150, window_size[1]//2-100, 100, 100)
 
@@ -54,13 +63,21 @@ with sd.InputStream(samplerate=sr, channels=1, blocksize=block, callback=audio_c
         y_vel += gravity
         player_rect.y += int(y_vel)
 
-        window.fill('sky blue')
-        draw.rect(window, 'red', player_rect)
+        # ВІДОБРАЖЕННЯ ФОНУ ЗАМІСТЬ FILL
+        window.blit(bg_image, (0, 0))
+        
+        window.blit(bird_image, player_rect)
 
         for pie in pies[:]:
             if not lose:
                 pie.x -= 10
-            draw.rect(window, 'green', pie)
+            
+            # МАЛЮВАННЯ ТРУБ ІЗ ЗОБРАЖЕННЯ
+            pipe_visual = transform.scale(pipe_img_raw, (pie.width, pie.height))
+            if pie.y == 0: # Якщо це верхня труба — перевертаємо її
+                pipe_visual = transform.flip(pipe_visual, False, True)
+            window.blit(pipe_visual, pie)
+
             if pie.x <= -100:
                 pies.remove(pie)
                 score += 0.5
@@ -68,7 +85,7 @@ with sd.InputStream(samplerate=sr, channels=1, blocksize=block, callback=audio_c
                 lose = True
 
         if len(pies) < 8:
-            pipes += generate_pipes(150)
+            pies += generate_pipes(150)
 
         score_text = main_font.render(f'{int(score)}', 1, 'black')
         window.blit(score_text, (window_size[0]//2 - score_text.get_rect().w//2, 40))
