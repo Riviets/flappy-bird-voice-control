@@ -2,6 +2,7 @@ import sounddevice as sd
 import numpy as np
 from pygame import *
 from random import randint
+import os
 
 sr = 16000
 block = 256
@@ -19,6 +20,23 @@ window_size = 1200, 800
 window = display.set_mode(window_size)
 clock = time.Clock()
 
+bird_image = image.load("bird.png").convert_alpha()
+bird_image = transform.scale(bird_image, (100, 100))
+
+bg_image = image.load("bg.png").convert()
+bg_image = transform.scale(bg_image, window_size)
+pipe_img_raw = image.load("pipe.png").convert_alpha()
+
+# --- ЗАВАНТАЖЕННЯ РЕКОРДУ З ФАЙЛУ ---
+high_score = 0
+if os.path.exists("record.txt"):
+    with open("record.txt", "r") as f:
+        try:
+            high_score = int(f.read())
+        except:
+            high_score = 0
+# ------------------------------------
+
 player_rect = Rect(150, window_size[1]//2-100, 100, 100)
 
 def generate_pipes(count, pipe_width=140, gap=280, min_height=50, max_height=440, distance=650):
@@ -34,6 +52,9 @@ def generate_pipes(count, pipe_width=140, gap=280, min_height=50, max_height=440
 
 pies = generate_pipes(150)
 main_font = font.Font(None, 100)
+# Шрифти для рекорду
+score_font = font.Font(None, 50) 
+
 score = 0
 lose = False
 wait = 40
@@ -47,42 +68,59 @@ with sd.InputStream(samplerate=sr, channels=1, blocksize=block, callback=audio_c
     while True:
         for e in event.get():
             if e.type == QUIT:
+                # --- ЗБЕРЕЖЕННЯ РЕКОРДУ ПРИ ЗАКРИТТІ ---
+                with open("record.txt", "w") as f:
+                    f.write(str(int(high_score)))
                 quit()
+                exit()
+                # ---------------------------------------
 
         if mic_level > THRESH:
             y_vel = IMPULSE
         y_vel += gravity
         player_rect.y += int(y_vel)
 
-        window.fill('sky blue')
-        draw.rect(window, 'red', player_rect)
+        window.blit(bg_image, (0, 0))
+        
+        angle = max(-45, min(25, y_vel * -3)) 
+        rotated_bird = transform.rotate(bird_image, angle)
+        bird_render_rect = rotated_bird.get_rect(center=player_rect.center)
+        window.blit(rotated_bird, bird_render_rect)
 
         for pie in pies[:]:
             if not lose:
                 pie.x -= 10
-            draw.rect(window, 'green', pie)
+            
+            pipe_visual = transform.scale(pipe_img_raw, (pie.width, pie.height))
+            if pie.y == 0:
+                pipe_visual = transform.flip(pipe_visual, False, True)
+            window.blit(pipe_visual, pie)
+
             if pie.x <= -100:
                 pies.remove(pie)
                 score += 0.5
+                # --- ОНОВЛЕННЯ РЕКОРДУ В РЕАЛЬНОМУ ЧАСІ ---
+                if score > high_score:
+                    high_score = score
+                # ------------------------------------------
+
             if player_rect.colliderect(pie):
                 lose = True
 
         if len(pies) < 8:
-            pipes += generate_pipes(150)
+            pies += generate_pipes(150)
 
+        # Відображення поточного рахунку
         score_text = main_font.render(f'{int(score)}', 1, 'black')
         window.blit(score_text, (window_size[0]//2 - score_text.get_rect().w//2, 40))
 
+        # --- ВІДОБРАЖЕННЯ РЕКОРДУ НА ЕКРАНІ ---
+        hi_text = score_font.render(f'Record: {int(high_score)}', 1, (50, 50, 50))
+        window.blit(hi_text, (20, 20))
+        # --------------------------------------
+
         display.update()
         clock.tick(60)
-
-        keys = key.get_pressed()
-        if keys[K_r] and lose:
-            lose = False
-            score = 0
-            pies = generate_pipes(150)
-            player_rect.y = window_size[1]//2-100
-            y_vel = 0.0
 
         if player_rect.bottom > window_size[1]:
             player_rect.bottom = window_size[1]
