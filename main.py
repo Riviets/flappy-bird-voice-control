@@ -2,6 +2,7 @@ import sounddevice as sd
 import numpy as np
 from pygame import *
 from random import randint
+import os
 
 sr = 16000
 block = 256
@@ -18,6 +19,10 @@ init()
 window_size = 1200, 800
 window = display.set_mode(window_size)
 clock = time.Clock()
+
+# Зміни для завантаження зображення
+bird_image = image.load("bird.png").convert_alpha()
+bird_image = transform.scale(bird_image, (100, 100))
 
 player_rect = Rect(150, window_size[1]//2-100, 100, 100)
 
@@ -55,7 +60,9 @@ with sd.InputStream(samplerate=sr, channels=1, blocksize=block, callback=audio_c
         player_rect.y += int(y_vel)
 
         window.fill('sky blue')
-        draw.rect(window, 'red', player_rect)
+        
+        # Малювання зображення замість draw.rect
+        window.blit(bird_image, player_rect)
 
         for pie in pies[:]:
             if not lose:
@@ -68,7 +75,7 @@ with sd.InputStream(samplerate=sr, channels=1, blocksize=block, callback=audio_c
                 lose = True
 
         if len(pies) < 8:
-            pipes += generate_pipes(150)
+            pies += generate_pipes(150)
 
         score_text = main_font.render(f'{int(score)}', 1, 'black')
         window.blit(score_text, (window_size[0]//2 - score_text.get_rect().w//2, 40))
